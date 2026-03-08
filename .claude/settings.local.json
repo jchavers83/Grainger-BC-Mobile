@@ -1,7 +1,14 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm install)"
+      "Bash(npm install)",
+      "WebFetch(domain:aps.autodesk.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(git add server/api.js)",
+      "Bash(git commit:*)",
+      "Bash(git push)",
+      "Bash(git add -A)"
     ]
   }
 }

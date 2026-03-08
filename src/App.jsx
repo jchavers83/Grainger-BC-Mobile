@@ -7,6 +7,7 @@ import ProjectDetail from './pages/ProjectDetail';
 import Contacts from './pages/Contacts';
 import Proposals from './pages/Proposals';
 import Files from './pages/Files';
+import Debug from './pages/Debug';
 
 export default function App() {
   const { authenticated, loading } = useAuth();
@@ -32,6 +33,7 @@ export default function App() {
         <Route path="/contacts" element={<Contacts />} />
         <Route path="/proposals" element={<Proposals />} />
         <Route path="/files" element={<Files />} />
+        <Route path="/debug" element={<Debug />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Layout>
