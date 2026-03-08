@@ -27,22 +27,26 @@ async function requireAuth(req, res, next) {
 // Authenticated GET request with automatic retry on 401
 async function apiGet(req, url, params = {}) {
   const cleanParams = Object.fromEntries(
-    Object.entries(params).filter(([, v]) => v !== undefined && v !== null)
+    Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== '')
   );
 
+  const config = {
+    headers: { Authorization: `Bearer ${req.session.tokens.access_token}` },
+  };
+
+  // Only include params if there are any
+  if (Object.keys(cleanParams).length > 0) {
+    config.params = cleanParams;
+  }
+
   try {
-    const response = await axios.get(url, {
-      headers: { Authorization: `Bearer ${req.session.tokens.access_token}` },
-      params: cleanParams,
-    });
+    const response = await axios.get(url, config);
     return response.data;
   } catch (err) {
     if (err.response?.status === 401) {
       const newToken = await refreshToken(req.session);
-      const response = await axios.get(url, {
-        headers: { Authorization: `Bearer ${newToken}` },
-        params: cleanParams,
-      });
+      config.headers.Authorization = `Bearer ${newToken}`;
+      const response = await axios.get(url, config);
       return response.data;
     }
     throw err;
@@ -53,14 +57,14 @@ async function apiGet(req, url, params = {}) {
 
 router.get('/projects', requireAuth, async (req, res) => {
   try {
-    const data = await apiGet(req, `${BC_BASE}/projects`, {
-      limit: req.query.limit || 100,
-      offset: req.query.offset || 0,
-    });
+    const data = await apiGet(req, `${BC_BASE}/projects`);
     res.json(data);
   } catch (err) {
-    console.error('Projects error:', err.response?.data || err.message);
-    res.status(err.response?.status || 500).json({ error: 'Failed to fetch projects' });
+    console.error('Projects error:', JSON.stringify(err.response?.data || err.message));
+    res.status(err.response?.status || 500).json({
+      error: 'Failed to fetch projects',
+      detail: err.response?.data || err.message,
+    });
   }
 });
 
@@ -69,8 +73,11 @@ router.get('/projects/:id', requireAuth, async (req, res) => {
     const data = await apiGet(req, `${BC_BASE}/projects/${req.params.id}`);
     res.json(data);
   } catch (err) {
-    console.error('Project detail error:', err.response?.data || err.message);
-    res.status(err.response?.status || 500).json({ error: 'Failed to fetch project' });
+    console.error('Project detail error:', JSON.stringify(err.response?.data || err.message));
+    res.status(err.response?.status || 500).json({
+      error: 'Failed to fetch project',
+      detail: err.response?.data || err.message,
+    });
   }
 });
 
@@ -78,27 +85,27 @@ router.get('/projects/:id', requireAuth, async (req, res) => {
 
 router.get('/projects/:id/bid-packages', requireAuth, async (req, res) => {
   try {
-    const data = await apiGet(req, `${BC_BASE}/projects/${req.params.id}/bid-packages`, {
-      limit: req.query.limit || 100,
-      offset: req.query.offset || 0,
-    });
+    const data = await apiGet(req, `${BC_BASE}/projects/${req.params.id}/bid-packages`);
     res.json(data);
   } catch (err) {
-    console.error('Bid packages error:', err.response?.data || err.message);
-    res.status(err.response?.status || 500).json({ error: 'Failed to fetch bid packages' });
+    console.error('Bid packages error:', JSON.stringify(err.response?.data || err.message));
+    res.status(err.response?.status || 500).json({
+      error: 'Failed to fetch bid packages',
+      detail: err.response?.data || err.message,
+    });
   }
 });
 
 router.get('/bid-packages/:id/invitees', requireAuth, async (req, res) => {
   try {
-    const data = await apiGet(req, `${BC_BASE}/bid-packages/${req.params.id}/invitees`, {
-      limit: req.query.limit || 100,
-      offset: req.query.offset || 0,
-    });
+    const data = await apiGet(req, `${BC_BASE}/bid-packages/${req.params.id}/invitees`);
     res.json(data);
   } catch (err) {
-    console.error('Invitees error:', err.response?.data || err.message);
-    res.status(err.response?.status || 500).json({ error: 'Failed to fetch invitees' });
+    console.error('Invitees error:', JSON.stringify(err.response?.data || err.message));
+    res.status(err.response?.status || 500).json({
+      error: 'Failed to fetch invitees',
+      detail: err.response?.data || err.message,
+    });
   }
 });
 
@@ -106,14 +113,14 @@ router.get('/bid-packages/:id/invitees', requireAuth, async (req, res) => {
 
 router.get('/projects/:id/opportunity-comments', requireAuth, async (req, res) => {
   try {
-    const data = await apiGet(req, `${BC_BASE}/projects/${req.params.id}/opportunity-comments`, {
-      limit: req.query.limit || 100,
-      offset: req.query.offset || 0,
-    });
+    const data = await apiGet(req, `${BC_BASE}/projects/${req.params.id}/opportunity-comments`);
     res.json(data);
   } catch (err) {
-    console.error('Comments error:', err.response?.data || err.message);
-    res.status(err.response?.status || 500).json({ error: 'Failed to fetch comments' });
+    console.error('Comments error:', JSON.stringify(err.response?.data || err.message));
+    res.status(err.response?.status || 500).json({
+      error: 'Failed to fetch comments',
+      detail: err.response?.data || err.message,
+    });
   }
 });
 
@@ -121,14 +128,14 @@ router.get('/projects/:id/opportunity-comments', requireAuth, async (req, res) =
 
 router.get('/contacts', requireAuth, async (req, res) => {
   try {
-    const data = await apiGet(req, `${BC_BASE}/contacts`, {
-      limit: req.query.limit || 100,
-      offset: req.query.offset || 0,
-    });
+    const data = await apiGet(req, `${BC_BASE}/contacts`);
     res.json(data);
   } catch (err) {
-    console.error('Contacts error:', err.response?.data || err.message);
-    res.status(err.response?.status || 500).json({ error: 'Failed to fetch contacts' });
+    console.error('Contacts error:', JSON.stringify(err.response?.data || err.message));
+    res.status(err.response?.status || 500).json({
+      error: 'Failed to fetch contacts',
+      detail: err.response?.data || err.message,
+    });
   }
 });
 
@@ -136,14 +143,14 @@ router.get('/contacts', requireAuth, async (req, res) => {
 
 router.get('/proposals', requireAuth, async (req, res) => {
   try {
-    const data = await apiGet(req, `${BC_BASE}/proposals`, {
-      limit: req.query.limit || 100,
-      offset: req.query.offset || 0,
-    });
+    const data = await apiGet(req, `${BC_BASE}/proposals`);
     res.json(data);
   } catch (err) {
-    console.error('Proposals error:', err.response?.data || err.message);
-    res.status(err.response?.status || 500).json({ error: 'Failed to fetch proposals' });
+    console.error('Proposals error:', JSON.stringify(err.response?.data || err.message));
+    res.status(err.response?.status || 500).json({
+      error: 'Failed to fetch proposals',
+      detail: err.response?.data || err.message,
+    });
   }
 });
 
@@ -152,8 +159,11 @@ router.get('/proposals/:id', requireAuth, async (req, res) => {
     const data = await apiGet(req, `${BC_BASE}/proposals/${req.params.id}`);
     res.json(data);
   } catch (err) {
-    console.error('Proposal detail error:', err.response?.data || err.message);
-    res.status(err.response?.status || 500).json({ error: 'Failed to fetch proposal' });
+    console.error('Proposal detail error:', JSON.stringify(err.response?.data || err.message));
+    res.status(err.response?.status || 500).json({
+      error: 'Failed to fetch proposal',
+      detail: err.response?.data || err.message,
+    });
   }
 });
 
@@ -161,7 +171,6 @@ router.get('/proposals/:id', requireAuth, async (req, res) => {
 
 router.get('/projects/:id/files', requireAuth, async (req, res) => {
   try {
-    // Get the BC project to find linked Autodesk Docs project
     const project = await apiGet(req, `${BC_BASE}/projects/${req.params.id}`);
 
     const accProjectId = project.autodeskDocsProjectId || project.linkedProjectId;
@@ -169,7 +178,6 @@ router.get('/projects/:id/files', requireAuth, async (req, res) => {
       return res.json({ results: [], message: 'No linked Autodesk Docs project found' });
     }
 
-    // Fetch top-level folder contents from Data Management API
     const topFolders = await apiGet(req, `${DM_BASE}/projects/b.${accProjectId}/folders`);
     const rootFolderId = topFolders?.data?.[0]?.id;
 
@@ -180,8 +188,28 @@ router.get('/projects/:id/files', requireAuth, async (req, res) => {
     const contents = await apiGet(req, `${DM_BASE}/projects/b.${accProjectId}/folders/${rootFolderId}/contents`);
     res.json(contents);
   } catch (err) {
-    console.error('Files error:', err.response?.data || err.message);
-    res.status(err.response?.status || 500).json({ error: 'Failed to fetch files' });
+    console.error('Files error:', JSON.stringify(err.response?.data || err.message));
+    res.status(err.response?.status || 500).json({
+      error: 'Failed to fetch files',
+      detail: err.response?.data || err.message,
+    });
+  }
+});
+
+// ─── Debug: raw API passthrough ──────────────────────────────────────────────
+// Helps diagnose exact API responses during development
+router.get('/debug/raw', requireAuth, async (req, res) => {
+  try {
+    const url = req.query.url;
+    if (!url) return res.status(400).json({ error: 'Provide ?url= parameter' });
+    const data = await apiGet(req, url);
+    res.json(data);
+  } catch (err) {
+    res.status(err.response?.status || 500).json({
+      error: err.message,
+      status: err.response?.status,
+      data: err.response?.data,
+    });
   }
 });
 
