@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: grainger-bc-mobile
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: APS_CLIENT_ID
+        value: CP72t6t9fZ3MCmCuHlD6o0Kmb2vSWkSvkB77gixfGKEyzvhr
+      - key: APS_CALLBACK_URL
+        value: https://grainger-bc-mobile.onrender.com/oauth/callback
+      - key: SESSION_SECRET
+        generateValue: true
