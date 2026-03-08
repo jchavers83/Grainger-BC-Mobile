@@ -4,7 +4,6 @@ import { refreshToken } from './auth.js';
 
 const router = Router();
 const BC_BASE = 'https://developer.api.autodesk.com/construction/buildingconnected/v2';
-const DM_BASE = 'https://developer.api.autodesk.com/data/v1';
 
 // Require authentication middleware
 async function requireAuth(req, res, next) {
@@ -12,7 +11,6 @@ async function requireAuth(req, res, next) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
 
-  // Proactively refresh if token expires within 60 seconds
   if (Date.now() >= req.session.tokens.expires_at - 60000) {
     try {
       await refreshToken(req.session);
@@ -33,8 +31,6 @@ async function apiGet(req, url, params = {}) {
   const config = {
     headers: { Authorization: `Bearer ${req.session.tokens.access_token}` },
   };
-
-  // Only include params if there are any
   if (Object.keys(cleanParams).length > 0) {
     config.params = cleanParams;
   }
@@ -81,11 +77,13 @@ router.get('/projects/:id', requireAuth, async (req, res) => {
   }
 });
 
-// ─── Bid Packages ────────────────────────────────────────────────────────────
+// ─── Bid Packages (top-level, filtered by projectId) ────────────────────────
 
 router.get('/projects/:id/bid-packages', requireAuth, async (req, res) => {
   try {
-    const data = await apiGet(req, `${BC_BASE}/projects/${req.params.id}/bid-packages`);
+    const data = await apiGet(req, `${BC_BASE}/bid-packages`, {
+      'filter[projectId]': req.params.id,
+    });
     res.json(data);
   } catch (err) {
     console.error('Bid packages error:', JSON.stringify(err.response?.data || err.message));
@@ -96,9 +94,27 @@ router.get('/projects/:id/bid-packages', requireAuth, async (req, res) => {
   }
 });
 
+router.get('/bid-packages/:id', requireAuth, async (req, res) => {
+  try {
+    const data = await apiGet(req, `${BC_BASE}/bid-packages/${req.params.id}`);
+    res.json(data);
+  } catch (err) {
+    console.error('Bid package detail error:', JSON.stringify(err.response?.data || err.message));
+    res.status(err.response?.status || 500).json({
+      error: 'Failed to fetch bid package',
+      detail: err.response?.data || err.message,
+    });
+  }
+});
+
+// ─── Invites (bidders per bid package, filtered by projectId) ────────────────
+
 router.get('/bid-packages/:id/invitees', requireAuth, async (req, res) => {
   try {
-    const data = await apiGet(req, `${BC_BASE}/bid-packages/${req.params.id}/invitees`);
+    // Try invites filtered by project, then fall back to bid-level invites
+    const data = await apiGet(req, `${BC_BASE}/invites`, {
+      'filter[bidPackageId]': req.params.id,
+    });
     res.json(data);
   } catch (err) {
     console.error('Invitees error:', JSON.stringify(err.response?.data || err.message));
@@ -109,12 +125,89 @@ router.get('/bid-packages/:id/invitees', requireAuth, async (req, res) => {
   }
 });
 
-// ─── Opportunity Comments ────────────────────────────────────────────────────
+// ─── Bids (filtered by projectId) ───────────────────────────────────────────
+
+router.get('/projects/:id/bids', requireAuth, async (req, res) => {
+  try {
+    const data = await apiGet(req, `${BC_BASE}/bids`, {
+      'filter[projectId]': req.params.id,
+    });
+    res.json(data);
+  } catch (err) {
+    console.error('Bids error:', JSON.stringify(err.response?.data || err.message));
+    res.status(err.response?.status || 500).json({
+      error: 'Failed to fetch bids',
+      detail: err.response?.data || err.message,
+    });
+  }
+});
+
+// ─── Bid Line Items ─────────────────────────────────────────────────────────
+
+router.get('/bids/:id/line-items', requireAuth, async (req, res) => {
+  try {
+    const data = await apiGet(req, `${BC_BASE}/bids/${req.params.id}/line-items`);
+    res.json(data);
+  } catch (err) {
+    console.error('Bid line items error:', JSON.stringify(err.response?.data || err.message));
+    res.status(err.response?.status || 500).json({
+      error: 'Failed to fetch bid line items',
+      detail: err.response?.data || err.message,
+    });
+  }
+});
+
+// ─── Opportunities ──────────────────────────────────────────────────────────
+
+router.get('/opportunities', requireAuth, async (req, res) => {
+  try {
+    const data = await apiGet(req, `${BC_BASE}/opportunities`);
+    res.json(data);
+  } catch (err) {
+    console.error('Opportunities error:', JSON.stringify(err.response?.data || err.message));
+    res.status(err.response?.status || 500).json({
+      error: 'Failed to fetch opportunities',
+      detail: err.response?.data || err.message,
+    });
+  }
+});
+
+router.get('/opportunities/:id', requireAuth, async (req, res) => {
+  try {
+    const data = await apiGet(req, `${BC_BASE}/opportunities/${req.params.id}`);
+    res.json(data);
+  } catch (err) {
+    console.error('Opportunity detail error:', JSON.stringify(err.response?.data || err.message));
+    res.status(err.response?.status || 500).json({
+      error: 'Failed to fetch opportunity',
+      detail: err.response?.data || err.message,
+    });
+  }
+});
+
+// ─── Opportunity Comments (messages) ─────────────────────────────────────────
 
 router.get('/projects/:id/opportunity-comments', requireAuth, async (req, res) => {
   try {
-    const data = await apiGet(req, `${BC_BASE}/projects/${req.params.id}/opportunity-comments`);
-    res.json(data);
+    // Try to get opportunities for this project, then get comments for each
+    const opps = await apiGet(req, `${BC_BASE}/opportunities`, {
+      'filter[projectId]': req.params.id,
+    });
+    const oppList = opps?.results || opps || [];
+
+    // Gather comments from all opportunities for this project
+    const allComments = [];
+    for (const opp of oppList.slice(0, 10)) {
+      try {
+        const comments = await apiGet(req, `${BC_BASE}/opportunities/${opp.id}/comments`);
+        const commentList = comments?.results || comments || [];
+        allComments.push(...commentList);
+      } catch {
+        // skip if comments endpoint fails for this opportunity
+      }
+    }
+
+    res.json({ results: allComments });
   } catch (err) {
     console.error('Comments error:', JSON.stringify(err.response?.data || err.message));
     res.status(err.response?.status || 500).json({
@@ -139,11 +232,11 @@ router.get('/contacts', requireAuth, async (req, res) => {
   }
 });
 
-// ─── Proposals ───────────────────────────────────────────────────────────────
+// ─── Project Bid Forms (proposals/line items) ────────────────────────────────
 
 router.get('/proposals', requireAuth, async (req, res) => {
   try {
-    const data = await apiGet(req, `${BC_BASE}/proposals`);
+    const data = await apiGet(req, `${BC_BASE}/project-bid-forms`);
     res.json(data);
   } catch (err) {
     console.error('Proposals error:', JSON.stringify(err.response?.data || err.message));
@@ -156,8 +249,16 @@ router.get('/proposals', requireAuth, async (req, res) => {
 
 router.get('/proposals/:id', requireAuth, async (req, res) => {
   try {
-    const data = await apiGet(req, `${BC_BASE}/proposals/${req.params.id}`);
-    res.json(data);
+    const form = await apiGet(req, `${BC_BASE}/project-bid-forms/${req.params.id}`);
+    // Also fetch line items
+    let lineItems = [];
+    try {
+      const liData = await apiGet(req, `${BC_BASE}/project-bid-forms/${req.params.id}/line-items`);
+      lineItems = liData?.results || liData || [];
+    } catch {
+      // line items may not exist
+    }
+    res.json({ ...form, lineItems });
   } catch (err) {
     console.error('Proposal detail error:', JSON.stringify(err.response?.data || err.message));
     res.status(err.response?.status || 500).json({
@@ -167,26 +268,31 @@ router.get('/proposals/:id', requireAuth, async (req, res) => {
   }
 });
 
-// ─── Files (Autodesk Docs via Data Management API) ───────────────────────────
+// ─── Files (via ACC Docs link from project) ──────────────────────────────────
 
 router.get('/projects/:id/files', requireAuth, async (req, res) => {
   try {
     const project = await apiGet(req, `${BC_BASE}/projects/${req.params.id}`);
 
-    const accProjectId = project.autodeskDocsProjectId || project.linkedProjectId;
-    if (!accProjectId) {
-      return res.json({ results: [], message: 'No linked Autodesk Docs project found' });
+    // BC projects link to ACC via currentAccLinkedProjectId or currentAccDocsFolderId
+    const accProjectId = project.currentAccLinkedProjectId;
+    const accFolderId = project.currentAccDocsFolderId;
+
+    if (accFolderId) {
+      // Directly fetch folder contents
+      const contents = await apiGet(req,
+        `https://developer.api.autodesk.com/data/v1/projects/b.${accProjectId}/folders/${accFolderId}/contents`
+      );
+      res.json(contents);
+    } else if (accProjectId) {
+      // Get top folders first
+      const topFolders = await apiGet(req,
+        `https://developer.api.autodesk.com/project/v1/hubs/b.${accProjectId}/projects/b.${accProjectId}/topFolders`
+      );
+      res.json(topFolders);
+    } else {
+      res.json({ results: [], message: 'No linked Autodesk Docs project found' });
     }
-
-    const topFolders = await apiGet(req, `${DM_BASE}/projects/b.${accProjectId}/folders`);
-    const rootFolderId = topFolders?.data?.[0]?.id;
-
-    if (!rootFolderId) {
-      return res.json({ results: [], message: 'No root folder found' });
-    }
-
-    const contents = await apiGet(req, `${DM_BASE}/projects/b.${accProjectId}/folders/${rootFolderId}/contents`);
-    res.json(contents);
   } catch (err) {
     console.error('Files error:', JSON.stringify(err.response?.data || err.message));
     res.status(err.response?.status || 500).json({
@@ -196,8 +302,23 @@ router.get('/projects/:id/files', requireAuth, async (req, res) => {
   }
 });
 
-// ─── Debug: raw API passthrough ──────────────────────────────────────────────
-// Helps diagnose exact API responses during development
+// ─── Project Costs ──────────────────────────────────────────────────────────
+
+router.get('/projects/:id/costs', requireAuth, async (req, res) => {
+  try {
+    const data = await apiGet(req, `${BC_BASE}/projects/${req.params.id}/costs`);
+    res.json(data);
+  } catch (err) {
+    console.error('Costs error:', JSON.stringify(err.response?.data || err.message));
+    res.status(err.response?.status || 500).json({
+      error: 'Failed to fetch costs',
+      detail: err.response?.data || err.message,
+    });
+  }
+});
+
+// ─── Debug endpoint ──────────────────────────────────────────────────────────
+
 router.get('/debug/raw', requireAuth, async (req, res) => {
   try {
     const url = req.query.url;
