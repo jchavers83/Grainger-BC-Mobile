@@ -279,7 +279,7 @@ body {
   white-space: nowrap;
 }
 
-.status-active, .status-open, .status-submitted, .status-accepted {
+.status-published, .status-active, .status-open, .status-submitted, .status-accepted {
   background: #e6f4ea;
   color: #1e7e34;
 }
@@ -347,7 +347,13 @@ body {
   gap: 6px;
 }
 
-.project-location, .project-dates {
+.project-client {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--primary);
+}
+
+.project-location, .project-dates, .project-number {
   font-size: 14px;
   color: var(--text-secondary);
 }

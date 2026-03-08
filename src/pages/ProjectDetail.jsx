@@ -5,6 +5,12 @@ import Loading from '../components/Loading';
 import ErrorMessage from '../components/ErrorMessage';
 import BidPackageCard from '../components/BidPackageCard';
 
+// Strip HTML tags for display
+function stripHtml(html) {
+  if (!html) return '';
+  return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
 export default function ProjectDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -12,6 +18,7 @@ export default function ProjectDetail() {
 
   const { data: project, loading, error } = useApi(`/api/projects/${id}`);
   const { data: bidPackages, loading: bidsLoading } = useApi(`/api/projects/${id}/bid-packages`);
+  const { data: bids, loading: bidsDataLoading } = useApi(`/api/projects/${id}/bids`);
   const { data: comments, loading: commentsLoading } = useApi(`/api/projects/${id}/opportunity-comments`);
 
   if (loading) return <Loading />;
@@ -25,7 +32,21 @@ export default function ProjectDetail() {
   ];
 
   const bidList = bidPackages?.results || bidPackages || [];
+  const bidDataList = bids?.results || bids || [];
   const commentList = comments?.results || comments || [];
+
+  // API uses "state" not "status"
+  const projectState = project.state || project.status || '';
+
+  // Build location from fields
+  const location = project.location
+    ? [
+        project.location.streetNumber,
+        project.location.streetName,
+        project.location.city,
+        project.location.state,
+      ].filter(Boolean).join(', ')
+    : '';
 
   return (
     <div className="page">
@@ -34,22 +55,24 @@ export default function ProjectDetail() {
           &larr; Back
         </button>
         <h1>{project.name}</h1>
-        {project.status && (
-          <span className={`status-badge status-${project.status.toLowerCase()}`}>
-            {project.status}
+        {projectState && (
+          <span className={`status-badge status-${projectState.toLowerCase()}`}>
+            {projectState}
           </span>
         )}
       </div>
 
       <div className="project-meta">
-        {project.location && (
+        {project.client && (
+          <div className="meta-item">
+            <span className="meta-label">Client</span>
+            <span>{project.client}</span>
+          </div>
+        )}
+        {location && (
           <div className="meta-item">
             <span className="meta-label">Location</span>
-            <span>
-              {typeof project.location === 'string'
-                ? project.location
-                : project.location.address || project.location.city || '—'}
-            </span>
+            <span>{location}</span>
           </div>
         )}
         {project.bidsDueAt && (
@@ -58,16 +81,40 @@ export default function ProjectDetail() {
             <span>{new Date(project.bidsDueAt).toLocaleDateString()}</span>
           </div>
         )}
-        {project.startAt && (
+        {project.rfisDueAt && (
           <div className="meta-item">
-            <span className="meta-label">Start Date</span>
-            <span>{new Date(project.startAt).toLocaleDateString()}</span>
+            <span className="meta-label">RFIs Due</span>
+            <span>{new Date(project.rfisDueAt).toLocaleDateString()}</span>
           </div>
         )}
-        {project.estimatedValue != null && (
+        {project.jobWalkAt && (
+          <div className="meta-item">
+            <span className="meta-label">Job Walk</span>
+            <span>{new Date(project.jobWalkAt).toLocaleDateString()}</span>
+          </div>
+        )}
+        {project.dueAt && (
+          <div className="meta-item">
+            <span className="meta-label">Due Date</span>
+            <span>{new Date(project.dueAt).toLocaleDateString()}</span>
+          </div>
+        )}
+        {project.value != null && (
           <div className="meta-item">
             <span className="meta-label">Est. Value</span>
-            <span>${Number(project.estimatedValue).toLocaleString()}</span>
+            <span>${Number(project.value).toLocaleString()}</span>
+          </div>
+        )}
+        {project.number && (
+          <div className="meta-item">
+            <span className="meta-label">Project #</span>
+            <span>{project.number}</span>
+          </div>
+        )}
+        {project.awarded && project.awarded !== 'UNKNOWN' && (
+          <div className="meta-item">
+            <span className="meta-label">Awarded</span>
+            <span>{project.awarded}</span>
           </div>
         )}
       </div>
@@ -80,6 +127,7 @@ export default function ProjectDetail() {
             onClick={() => setActiveTab(tab.key)}
           >
             {tab.label}
+            {tab.key === 'bids' && bidList.length > 0 && ` (${bidList.length})`}
           </button>
         ))}
       </div>
@@ -92,7 +140,7 @@ export default function ProjectDetail() {
                 <div className="empty-state"><p>No bid packages</p></div>
               ) : (
                 bidList.map(bp => (
-                  <BidPackageCard key={bp.id} bidPackage={bp} />
+                  <BidPackageCard key={bp.id} bidPackage={bp} bids={bidDataList} />
                 ))
               )}
             </div>
@@ -109,16 +157,16 @@ export default function ProjectDetail() {
                   <div key={comment.id || i} className="message-card">
                     <div className="message-header">
                       <span className="message-author">
-                        {comment.author?.name || comment.createdBy || 'Unknown'}
+                        {comment.authorName || comment.author?.name || comment.createdBy || 'Unknown'}
                       </span>
                       <span className="message-date">
-                        {comment.createdAt
-                          ? new Date(comment.createdAt).toLocaleDateString()
+                        {(comment.createdAt || comment.updatedAt)
+                          ? new Date(comment.createdAt || comment.updatedAt).toLocaleDateString()
                           : ''}
                       </span>
                     </div>
                     <p className="message-body">
-                      {comment.body || comment.text || comment.content}
+                      {stripHtml(comment.body || comment.text || comment.content || comment.message || '')}
                     </p>
                   </div>
                 ))
@@ -133,24 +181,48 @@ export default function ProjectDetail() {
               <span className="detail-label">Project Name</span>
               <span className="detail-value">{project.name}</span>
             </div>
-            {project.type && (
+            {project.number && (
               <div className="detail-row">
-                <span className="detail-label">Type</span>
-                <span className="detail-value">{project.type}</span>
+                <span className="detail-label">Number</span>
+                <span className="detail-value">{project.number}</span>
               </div>
             )}
-            {project.estimatedValue != null && (
+            {project.client && (
+              <div className="detail-row">
+                <span className="detail-label">Client</span>
+                <span className="detail-value">{project.client}</span>
+              </div>
+            )}
+            {projectState && (
+              <div className="detail-row">
+                <span className="detail-label">State</span>
+                <span className="detail-value">{projectState}</span>
+              </div>
+            )}
+            {project.projectSize && (
+              <div className="detail-row">
+                <span className="detail-label">Project Size</span>
+                <span className="detail-value">{project.projectSize}</span>
+              </div>
+            )}
+            {project.value != null && (
               <div className="detail-row">
                 <span className="detail-label">Estimated Value</span>
                 <span className="detail-value">
-                  ${Number(project.estimatedValue).toLocaleString()}
+                  ${Number(project.value).toLocaleString()}
                 </span>
               </div>
             )}
             {project.description && (
               <div className="detail-row">
                 <span className="detail-label">Description</span>
-                <span className="detail-value">{project.description}</span>
+                <span className="detail-value">{stripHtml(project.description)}</span>
+              </div>
+            )}
+            {project.notes && (
+              <div className="detail-row">
+                <span className="detail-label">Notes</span>
+                <span className="detail-value">{stripHtml(project.notes)}</span>
               </div>
             )}
           </div>
