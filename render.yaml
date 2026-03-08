@@ -2,9 +2,10 @@ services:
   - type: web
     name: grainger-bc-mobile
     runtime: node
+    nodeVersion: "20"
     plan: free
     buildCommand: npm install && npm run build
-    startCommand: npm start
+    startCommand: node server/index.js
     envVars:
       - key: NODE_ENV
         value: production
