@@ -8,6 +8,20 @@ function stripHtml(html) {
   return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
+// Status priority for sorting: lower number = higher priority (shown first)
+function getStatusPriority(status) {
+  const s = (status || '').toUpperCase();
+  // Submitted / bidding / accepted — show first
+  if (s.includes('SUBMITTED') || s.includes('ACCEPTED') || s === 'BID_SUBMITTED') return 1;
+  if (s === 'BIDDING' || s === 'RESPONDING') return 2;
+  // Undecided / invited — middle
+  if (s === 'UNDECIDED' || s === 'INVITED' || s === 'PENDING') return 3;
+  // Not bidding / declined — show last
+  if (s === 'NOT_BIDDING' || s.includes('NOT BIDDING') || s === 'DECLINED' || s === 'REJECTED') return 4;
+  // Everything else
+  return 3;
+}
+
 export default function BidPackageCard({ bidPackage }) {
   const [expanded, setExpanded] = useState(false);
   const { data: invitees, loading } = useApi(
@@ -33,6 +47,13 @@ export default function BidPackageCard({ bidPackage }) {
       || 'Invited';
   }
 
+  // Sort bidders: bidding/submitted first, undecided middle, not-bidding last
+  const sortedInvitees = [...inviteeList].sort((a, b) => {
+    const statusA = getInviteeStatus(a);
+    const statusB = getInviteeStatus(b);
+    return getStatusPriority(statusA) - getStatusPriority(statusB);
+  });
+
   // Bid package uses "state" not "status"
   const bpState = bidPackage.state || bidPackage.status || '';
   // Keywords array replaces "trade"
@@ -44,9 +65,6 @@ export default function BidPackageCard({ bidPackage }) {
       <div className="bid-card-header" onClick={() => setExpanded(!expanded)}>
         <div className="bid-info">
           <h3>{bidPackage.name || trade || 'Bid Package'}</h3>
-          {bidPackage.number && (
-            <span className="bid-number">#{bidPackage.number}</span>
-          )}
           {trade && bidPackage.name && (
             <span className="bid-trade">{trade}</span>
           )}
@@ -75,7 +93,7 @@ export default function BidPackageCard({ bidPackage }) {
             <p className="empty-inline">No bidders found</p>
           ) : (
             <div className="invitee-list">
-              {inviteeList.map((inv, i) => {
+              {sortedInvitees.map((inv, i) => {
                 const name = getInviteeName(inv);
                 const status = getInviteeStatus(inv);
                 return (

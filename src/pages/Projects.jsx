@@ -11,19 +11,29 @@ export default function Projects() {
 
   const projects = data?.results || data || [];
 
+  // Sort by bid due date — soonest first, projects without due dates at the end
+  const sorted = [...projects].sort((a, b) => {
+    const dateA = a.bidsDueAt || a.dueAt;
+    const dateB = b.bidsDueAt || b.dueAt;
+    if (!dateA && !dateB) return 0;
+    if (!dateA) return 1;  // no date goes to end
+    if (!dateB) return -1;
+    return new Date(dateA) - new Date(dateB);
+  });
+
   return (
     <div className="page">
       <div className="page-header">
         <h1>Projects</h1>
-        <span className="badge">{projects.length}</span>
+        <span className="badge">{sorted.length}</span>
       </div>
       <div className="card-list">
-        {projects.length === 0 ? (
+        {sorted.length === 0 ? (
           <div className="empty-state">
             <p>No active projects found</p>
           </div>
         ) : (
-          projects.map(project => (
+          sorted.map(project => (
             <ProjectCard key={project.id} project={project} />
           ))
         )}

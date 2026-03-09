@@ -105,12 +105,6 @@ export default function ProjectDetail() {
             <span>${Number(project.value).toLocaleString()}</span>
           </div>
         )}
-        {project.number && (
-          <div className="meta-item">
-            <span className="meta-label">Project #</span>
-            <span>{project.number}</span>
-          </div>
-        )}
         {project.awarded && project.awarded !== 'UNKNOWN' && (
           <div className="meta-item">
             <span className="meta-label">Awarded</span>
@@ -151,7 +145,13 @@ export default function ProjectDetail() {
           commentsLoading ? <Loading /> : (
             <div className="messages-list">
               {commentList.length === 0 ? (
-                <div className="empty-state"><p>No messages</p></div>
+                <div className="empty-state">
+                  <p>No messages available</p>
+                  <p style={{ fontSize: 13, color: '#888', marginTop: 8 }}>
+                    BC inbox messages may not be accessible via the API.
+                    Check BuildingConnected directly for inbox messages.
+                  </p>
+                </div>
               ) : (
                 commentList.map((comment, i) => (
                   <div key={comment.id || i} className="message-card">
@@ -181,12 +181,6 @@ export default function ProjectDetail() {
               <span className="detail-label">Project Name</span>
               <span className="detail-value">{project.name}</span>
             </div>
-            {project.number && (
-              <div className="detail-row">
-                <span className="detail-label">Number</span>
-                <span className="detail-value">{project.number}</span>
-              </div>
-            )}
             {project.client && (
               <div className="detail-row">
                 <span className="detail-label">Client</span>
