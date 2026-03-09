@@ -1,5 +1,4 @@
 import { useAuth } from '../context/AuthContext';
-import BottomNav from './BottomNav';
 
 export default function Layout({ children }) {
   const { logout } = useAuth();
@@ -7,7 +6,7 @@ export default function Layout({ children }) {
   return (
     <div className="app-layout">
       <header className="app-header">
-        <h1 className="app-title">Grainger BC</h1>
+        <h1 className="app-title">Grainger BC Mobile</h1>
         <button className="btn-logout" onClick={logout}>
           Sign Out
         </button>
@@ -15,7 +14,6 @@ export default function Layout({ children }) {
       <main className="app-main">
         {children}
       </main>
-      <BottomNav />
     </div>
   );
 }

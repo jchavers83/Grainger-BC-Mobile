@@ -18,8 +18,6 @@ export default function ProjectDetail() {
 
   const { data: project, loading, error } = useApi(`/api/projects/${id}`);
   const { data: bidPackages, loading: bidsLoading } = useApi(`/api/projects/${id}/bid-packages`);
-  const { data: bids, loading: bidsDataLoading } = useApi(`/api/projects/${id}/bids`);
-  const { data: comments, loading: commentsLoading } = useApi(`/api/projects/${id}/opportunity-comments`);
 
   if (loading) return <Loading />;
   if (error) return <ErrorMessage message={error} />;
@@ -27,13 +25,10 @@ export default function ProjectDetail() {
 
   const tabs = [
     { key: 'bids', label: 'Bid Packages' },
-    { key: 'comments', label: 'Messages' },
     { key: 'details', label: 'Details' },
   ];
 
   const bidList = bidPackages?.results || bidPackages || [];
-  const bidDataList = bids?.results || bids || [];
-  const commentList = comments?.results || comments || [];
 
   // API uses "state" not "status"
   const projectState = project.state || project.status || '';
@@ -134,41 +129,7 @@ export default function ProjectDetail() {
                 <div className="empty-state"><p>No bid packages</p></div>
               ) : (
                 bidList.map(bp => (
-                  <BidPackageCard key={bp.id} bidPackage={bp} bids={bidDataList} />
-                ))
-              )}
-            </div>
-          )
-        )}
-
-        {activeTab === 'comments' && (
-          commentsLoading ? <Loading /> : (
-            <div className="messages-list">
-              {commentList.length === 0 ? (
-                <div className="empty-state">
-                  <p>No messages available</p>
-                  <p style={{ fontSize: 13, color: '#888', marginTop: 8 }}>
-                    BC inbox messages may not be accessible via the API.
-                    Check BuildingConnected directly for inbox messages.
-                  </p>
-                </div>
-              ) : (
-                commentList.map((comment, i) => (
-                  <div key={comment.id || i} className="message-card">
-                    <div className="message-header">
-                      <span className="message-author">
-                        {comment.authorName || comment.author?.name || comment.createdBy || 'Unknown'}
-                      </span>
-                      <span className="message-date">
-                        {(comment.createdAt || comment.updatedAt)
-                          ? new Date(comment.createdAt || comment.updatedAt).toLocaleDateString()
-                          : ''}
-                      </span>
-                    </div>
-                    <p className="message-body">
-                      {stripHtml(comment.body || comment.text || comment.content || comment.message || '')}
-                    </p>
-                  </div>
+                  <BidPackageCard key={bp.id} bidPackage={bp} />
                 ))
               )}
             </div>

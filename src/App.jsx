@@ -4,9 +4,6 @@ import Layout from './components/Layout';
 import Login from './pages/Login';
 import Projects from './pages/Projects';
 import ProjectDetail from './pages/ProjectDetail';
-import Contacts from './pages/Contacts';
-import Proposals from './pages/Proposals';
-import Files from './pages/Files';
 import Debug from './pages/Debug';
 
 export default function App() {
@@ -30,9 +27,6 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Projects />} />
         <Route path="/projects/:id" element={<ProjectDetail />} />
-        <Route path="/contacts" element={<Contacts />} />
-        <Route path="/proposals" element={<Proposals />} />
-        <Route path="/files" element={<Files />} />
         <Route path="/debug" element={<Debug />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

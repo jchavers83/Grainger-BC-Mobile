@@ -1,4 +1,4 @@
-const CACHE_NAME = 'grainger-bc-v2';
+const CACHE_NAME = 'grainger-bc-v3';
 const STATIC_ASSETS = [
   '/',
   '/manifest.json',
