@@ -107,14 +107,20 @@ router.get('/bid-packages/:id', requireAuth, async (req, res) => {
   }
 });
 
-// ─── Invites (bidders per bid package, filtered by projectId) ────────────────
+// ─── Invites (bidders per bid package) ──────────────────────────────────────
 
 router.get('/bid-packages/:id/invitees', requireAuth, async (req, res) => {
   try {
-    // Try invites filtered by project, then fall back to bid-level invites
     const data = await apiGet(req, `${BC_BASE}/invites`, {
       'filter[bidPackageId]': req.params.id,
     });
+    // Log first invite to see actual field names
+    const list = data?.results || [];
+    if (list.length > 0) {
+      console.log('=== INVITE FIELDS ===');
+      console.log('Keys:', Object.keys(list[0]));
+      console.log('First invite:', JSON.stringify(list[0], null, 2));
+    }
     res.json(data);
   } catch (err) {
     console.error('Invitees error:', JSON.stringify(err.response?.data || err.message));
@@ -132,6 +138,12 @@ router.get('/projects/:id/bids', requireAuth, async (req, res) => {
     const data = await apiGet(req, `${BC_BASE}/bids`, {
       'filter[projectId]': req.params.id,
     });
+    // Log first bid to see actual field names
+    const list = data?.results || [];
+    if (list.length > 0) {
+      console.log('=== BID FIELDS ===');
+      console.log('Keys:', Object.keys(list[0]));
+    }
     res.json(data);
   } catch (err) {
     console.error('Bids error:', JSON.stringify(err.response?.data || err.message));
@@ -194,6 +206,7 @@ router.get('/projects/:id/opportunity-comments', requireAuth, async (req, res) =
       'filter[projectId]': req.params.id,
     });
     const oppList = opps?.results || opps || [];
+    console.log(`Found ${oppList.length} opportunities for project ${req.params.id}`);
 
     // Gather comments from all opportunities for this project
     const allComments = [];
@@ -201,15 +214,24 @@ router.get('/projects/:id/opportunity-comments', requireAuth, async (req, res) =
       try {
         const comments = await apiGet(req, `${BC_BASE}/opportunities/${opp.id}/comments`);
         const commentList = comments?.results || comments || [];
+        console.log(`Opportunity ${opp.id}: ${commentList.length} comments`);
+        if (commentList.length > 0) {
+          console.log('Comment keys:', Object.keys(commentList[0]));
+        }
         allComments.push(...commentList);
-      } catch {
-        // skip if comments endpoint fails for this opportunity
+      } catch (commentErr) {
+        console.log(`Comments failed for opp ${opp.id}: ${commentErr.response?.status}`);
       }
     }
 
     res.json({ results: allComments });
   } catch (err) {
     console.error('Comments error:', JSON.stringify(err.response?.data || err.message));
+    // Return empty results instead of error if opportunities endpoint fails
+    if (err.response?.status === 404) {
+      res.json({ results: [] });
+      return;
+    }
     res.status(err.response?.status || 500).json({
       error: 'Failed to fetch comments',
       detail: err.response?.data || err.message,
@@ -222,9 +244,22 @@ router.get('/projects/:id/opportunity-comments', requireAuth, async (req, res) =
 router.get('/contacts', requireAuth, async (req, res) => {
   try {
     const data = await apiGet(req, `${BC_BASE}/contacts`);
+    console.log('Contacts response keys:', Object.keys(data));
+    const list = data?.results || [];
+    console.log('Contacts count:', list.length);
+    if (list.length > 0) {
+      console.log('First contact keys:', Object.keys(list[0]));
+      console.log('First contact:', JSON.stringify(list[0], null, 2));
+    }
     res.json(data);
   } catch (err) {
+    console.error('Contacts error status:', err.response?.status);
     console.error('Contacts error:', JSON.stringify(err.response?.data || err.message));
+    // If contacts endpoint doesn't exist, return empty instead of crashing
+    if (err.response?.status === 404 || err.response?.status === 403) {
+      res.json({ results: [], message: 'Contacts endpoint not available for this account' });
+      return;
+    }
     res.status(err.response?.status || 500).json({
       error: 'Failed to fetch contacts',
       detail: err.response?.data || err.message,
@@ -237,9 +272,21 @@ router.get('/contacts', requireAuth, async (req, res) => {
 router.get('/proposals', requireAuth, async (req, res) => {
   try {
     const data = await apiGet(req, `${BC_BASE}/project-bid-forms`);
+    console.log('Proposals response keys:', Object.keys(data));
+    const list = data?.results || [];
+    console.log('Proposals count:', list.length);
+    if (list.length > 0) {
+      console.log('First proposal keys:', Object.keys(list[0]));
+    }
     res.json(data);
   } catch (err) {
+    console.error('Proposals error status:', err.response?.status);
     console.error('Proposals error:', JSON.stringify(err.response?.data || err.message));
+    // Return empty if endpoint not available
+    if (err.response?.status === 404 || err.response?.status === 403) {
+      res.json({ results: [], message: 'Bid forms endpoint not available' });
+      return;
+    }
     res.status(err.response?.status || 500).json({
       error: 'Failed to fetch proposals',
       detail: err.response?.data || err.message,
@@ -268,31 +315,47 @@ router.get('/proposals/:id', requireAuth, async (req, res) => {
   }
 });
 
-// ─── Files (via ACC Docs link from project) ──────────────────────────────────
+// ─── Files (bid package documents) ──────────────────────────────────────────
+// Since user only has BuildingConnected (not ACC Docs), files are attached
+// to bid packages. We fetch bid packages for a project and list their docs.
 
 router.get('/projects/:id/files', requireAuth, async (req, res) => {
   try {
-    const project = await apiGet(req, `${BC_BASE}/projects/${req.params.id}`);
+    // Get bid packages for this project
+    const bpData = await apiGet(req, `${BC_BASE}/bid-packages`, {
+      'filter[projectId]': req.params.id,
+    });
+    const bidPackages = bpData?.results || [];
 
-    // BC projects link to ACC via currentAccLinkedProjectId or currentAccDocsFolderId
-    const accProjectId = project.currentAccLinkedProjectId;
-    const accFolderId = project.currentAccDocsFolderId;
-
-    if (accFolderId) {
-      // Directly fetch folder contents
-      const contents = await apiGet(req,
-        `https://developer.api.autodesk.com/data/v1/projects/b.${accProjectId}/folders/${accFolderId}/contents`
-      );
-      res.json(contents);
-    } else if (accProjectId) {
-      // Get top folders first
-      const topFolders = await apiGet(req,
-        `https://developer.api.autodesk.com/project/v1/hubs/b.${accProjectId}/projects/b.${accProjectId}/topFolders`
-      );
-      res.json(topFolders);
-    } else {
-      res.json({ results: [], message: 'No linked Autodesk Docs project found' });
+    // Try to get documents for each bid package
+    const allFiles = [];
+    for (const bp of bidPackages) {
+      try {
+        const docs = await apiGet(req, `${BC_BASE}/bid-packages/${bp.id}/documents`);
+        const docList = docs?.results || docs || [];
+        if (docList.length > 0) {
+          console.log(`BP ${bp.name} docs keys:`, Object.keys(docList[0]));
+        }
+        // Tag each doc with the bid package name
+        docList.forEach(doc => {
+          allFiles.push({ ...doc, bidPackageName: bp.name, bidPackageId: bp.id });
+        });
+      } catch (docErr) {
+        // Try alternate endpoint: attachments
+        try {
+          const attachments = await apiGet(req, `${BC_BASE}/bid-packages/${bp.id}/attachments`);
+          const attList = attachments?.results || attachments || [];
+          attList.forEach(att => {
+            allFiles.push({ ...att, bidPackageName: bp.name, bidPackageId: bp.id });
+          });
+        } catch {
+          // No documents endpoint available for this bid package
+          console.log(`No docs/attachments for BP ${bp.name}: ${docErr.response?.status}`);
+        }
+      }
     }
+
+    res.json({ results: allFiles });
   } catch (err) {
     console.error('Files error:', JSON.stringify(err.response?.data || err.message));
     res.status(err.response?.status || 500).json({

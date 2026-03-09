@@ -17,7 +17,7 @@ export default function Files() {
         <h1>Files</h1>
       </div>
       <p className="page-description">
-        Select a project to view linked Autodesk Docs files.
+        Files attached to bid packages for each project.
       </p>
       <div className="card-list">
         {projects.length === 0 ? (
@@ -52,29 +52,31 @@ function ProjectFilesSection({ project }) {
           {loading ? <Loading /> : error ? (
             <div className="error-inline">{error}</div>
           ) : files.length === 0 ? (
-            <div className="empty-state"><p>No files linked</p></div>
+            <div className="empty-state"><p>No files found for this project's bid packages</p></div>
           ) : (
             files.map((file, i) => (
               <div key={file.id || i} className="file-card">
                 <div className="file-icon">
-                  {getFileIcon(file.attributes?.displayName || file.name || '')}
+                  {getFileIcon(file.name || file.fileName || file.title || '')}
                 </div>
                 <div className="file-info">
                   <div className="file-name">
-                    {file.attributes?.displayName || file.name}
+                    {file.name || file.fileName || file.title || 'Document'}
                   </div>
                   <div className="file-meta">
-                    {file.attributes?.fileType && (
-                      <span>{file.attributes.fileType}</span>
+                    {file.bidPackageName && (
+                      <span className="file-bp-tag">{file.bidPackageName}</span>
                     )}
-                    {file.attributes?.storageSize && (
-                      <span>{formatSize(file.attributes.storageSize)}</span>
+                    {file.fileType && <span>{file.fileType}</span>}
+                    {file.size && <span>{formatSize(file.size)}</span>}
+                    {file.createdAt && (
+                      <span>{new Date(file.createdAt).toLocaleDateString()}</span>
                     )}
                   </div>
                 </div>
-                {file.links?.webView && (
+                {(file.url || file.downloadUrl || file.webUrl) && (
                   <a
-                    href={file.links.webView.href}
+                    href={file.url || file.downloadUrl || file.webUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="btn-sm"

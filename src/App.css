@@ -450,10 +450,32 @@ body {
   margin-bottom: 4px;
 }
 
+.bid-number {
+  font-size: 12px;
+  color: var(--text-secondary);
+  display: block;
+}
+
 .bid-trade, .bid-due {
   font-size: 13px;
   color: var(--text-secondary);
   display: block;
+}
+
+.bid-instructions {
+  font-size: 13px;
+  color: var(--text-secondary);
+  padding: 12px 0 4px;
+  line-height: 1.4;
+}
+
+.file-bp-tag {
+  background: #e3f2fd;
+  color: #1565c0;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 500;
 }
 
 .bid-invitees {

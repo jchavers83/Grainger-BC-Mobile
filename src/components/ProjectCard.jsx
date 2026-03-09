@@ -36,9 +36,6 @@ export default function ProjectCard({ project }) {
             <span>Job Walk: {new Date(project.jobWalkAt).toLocaleDateString()}</span>
           )}
         </div>
-        {project.number && (
-          <div className="project-number">#{project.number}</div>
-        )}
       </div>
     </div>
   );

@@ -2,6 +2,12 @@ import { useState } from 'react';
 import { useApi } from '../hooks/useApi';
 import Loading from './Loading';
 
+// Strip HTML tags for display
+function stripHtml(html) {
+  if (!html) return '';
+  return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
 export default function BidPackageCard({ bidPackage }) {
   const [expanded, setExpanded] = useState(false);
   const { data: invitees, loading } = useApi(
@@ -11,41 +17,47 @@ export default function BidPackageCard({ bidPackage }) {
 
   const inviteeList = invitees?.results || invitees || [];
 
-  // Flexible field extraction — tries multiple possible field names
+  // API field: bidderCompany is a nested object with name
   function getInviteeName(inv) {
-    return inv.contactName || inv.contact?.name || inv.name
+    return inv.bidderCompany?.name
+      || inv.bidderCompanyName
       || inv.companyName || inv.company?.name
-      || inv.bidderName || inv.bidder?.name
-      || inv.email || inv.contactEmail
+      || inv.contactName || inv.contact?.name
+      || inv.name || inv.email
       || 'Unknown';
   }
 
-  function getInviteeCompany(inv) {
-    return inv.companyName || inv.company?.name || inv.company
-      || inv.businessName || inv.organizationName || '';
+  function getInviteeStatus(inv) {
+    return inv.state || inv.status || inv.bidStatus
+      || inv.inviteStatus || inv.responseStatus
+      || 'Invited';
   }
 
-  function getInviteeStatus(inv) {
-    return inv.bidStatus || inv.status || inv.inviteStatus
-      || inv.responseStatus || inv.state || 'Pending';
-  }
+  // Bid package uses "state" not "status"
+  const bpState = bidPackage.state || bidPackage.status || '';
+  // Keywords array replaces "trade"
+  const keywords = bidPackage.keywords || [];
+  const trade = bidPackage.trade || (keywords.length > 0 ? keywords.join(', ') : '');
 
   return (
     <div className="bid-card">
       <div className="bid-card-header" onClick={() => setExpanded(!expanded)}>
         <div className="bid-info">
-          <h3>{bidPackage.name || bidPackage.trade || bidPackage.scope || 'Bid Package'}</h3>
-          {bidPackage.trade && (
-            <span className="bid-trade">{bidPackage.trade}</span>
+          <h3>{bidPackage.name || trade || 'Bid Package'}</h3>
+          {bidPackage.number && (
+            <span className="bid-number">#{bidPackage.number}</span>
           )}
-          {(bidPackage.bidsDueAt || bidPackage.dueAt) && (
+          {trade && bidPackage.name && (
+            <span className="bid-trade">{trade}</span>
+          )}
+          {bidPackage.bidsDueAt && (
             <span className="bid-due">
-              Due: {new Date(bidPackage.bidsDueAt || bidPackage.dueAt).toLocaleDateString()}
+              Due: {new Date(bidPackage.bidsDueAt).toLocaleDateString()}
             </span>
           )}
-          {bidPackage.status && (
-            <span className={`status-badge status-${bidPackage.status.toLowerCase()}`}>
-              {bidPackage.status}
+          {bpState && (
+            <span className={`status-badge status-${bpState.toLowerCase()}`}>
+              {bpState}
             </span>
           )}
         </div>
@@ -53,6 +65,11 @@ export default function BidPackageCard({ bidPackage }) {
       </div>
       {expanded && (
         <div className="bid-invitees">
+          {bidPackage.instructions && (
+            <div className="bid-instructions">
+              <strong>Instructions:</strong> {stripHtml(bidPackage.instructions)}
+            </div>
+          )}
           <h4>Bidders ({inviteeList.length})</h4>
           {loading ? <Loading /> : inviteeList.length === 0 ? (
             <p className="empty-inline">No bidders found</p>
@@ -60,15 +77,11 @@ export default function BidPackageCard({ bidPackage }) {
             <div className="invitee-list">
               {inviteeList.map((inv, i) => {
                 const name = getInviteeName(inv);
-                const company = getInviteeCompany(inv);
                 const status = getInviteeStatus(inv);
                 return (
                   <div key={inv.id || i} className="invitee-row">
                     <div className="invitee-info">
                       <span className="invitee-name">{name}</span>
-                      {company && company !== name && (
-                        <span className="invitee-company">{company}</span>
-                      )}
                     </div>
                     <span className={`invitee-status status-${status.toLowerCase().replace(/\s+/g, '-')}`}>
                       {status}
