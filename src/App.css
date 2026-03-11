@@ -186,7 +186,7 @@ body {
 
 .app-main {
   flex: 1;
-  padding-bottom: var(--safe-bottom);
+  padding-bottom: calc(var(--nav-height) + var(--safe-bottom) + 8px);
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
@@ -530,6 +530,21 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.invitee-bid-amount {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--primary);
+  margin-top: 2px;
+}
+
+.invitee-attachments {
+  display: inline-block;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 2px;
 }
 
 .invitee-status {

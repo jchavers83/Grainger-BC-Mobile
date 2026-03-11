@@ -5,7 +5,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import authRouter from './auth.js';
-import apiRouter from './api.js';
+import apiRouter, { apiGet } from './api.js';
+import { startCalendarSync } from './calendar-sync.js';
 
 dotenv.config();
 
@@ -19,7 +20,7 @@ app.set('trust proxy', 1);
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 
-app.use(session({
+const sessionMiddleware = session({
   secret: process.env.SESSION_SECRET || 'dev-secret-change-in-production',
   resave: false,
   saveUninitialized: false,
@@ -29,7 +30,20 @@ app.use(session({
     maxAge: 24 * 60 * 60 * 1000,
     sameSite: 'lax',
   },
-}));
+});
+
+app.use(sessionMiddleware);
+
+// Track the most recent authenticated session for calendar sync polling
+let lastAuthenticatedSession = null;
+
+// Capture authenticated sessions for background sync
+app.use((req, res, next) => {
+  if (req.session?.tokens?.access_token) {
+    lastAuthenticatedSession = req.session;
+  }
+  next();
+});
 
 // Auth routes (handles /auth/* and /oauth/callback)
 app.use(authRouter);
@@ -47,4 +61,17 @@ if (process.env.NODE_ENV === 'production') {
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+
+  // Start calendar sync if ENABLE_CALENDAR_SYNC is set
+  if (process.env.ENABLE_CALENDAR_SYNC === 'true') {
+    startCalendarSync(apiGet, () => {
+      if (!lastAuthenticatedSession?.tokens?.access_token) {
+        return null;
+      }
+      // Return a mock req object with the session for apiGet
+      return { session: lastAuthenticatedSession };
+    });
+  } else {
+    console.log('[CalSync] Calendar sync disabled. Set ENABLE_CALENDAR_SYNC=true to enable.');
+  }
 });

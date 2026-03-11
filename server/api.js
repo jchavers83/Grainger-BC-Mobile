@@ -77,6 +77,34 @@ router.get('/projects/:id', requireAuth, async (req, res) => {
   }
 });
 
+// ─── Project Team Members ───────────────────────────────────────────────────
+
+router.get('/projects/:id/team', requireAuth, async (req, res) => {
+  try {
+    const data = await apiGet(req, `${BC_BASE}/project-team-members`, {
+      'filter[projectId]': req.params.id,
+    });
+    const list = data?.results || [];
+    if (list.length > 0) {
+      console.log('=== TEAM MEMBER FIELDS ===');
+      console.log('Keys:', Object.keys(list[0]));
+      console.log('First member:', JSON.stringify(list[0], null, 2));
+    }
+    res.json(data);
+  } catch (err) {
+    console.error('Team members error:', err.response?.status, JSON.stringify(err.response?.data || err.message));
+    // Return empty if endpoint not available
+    if (err.response?.status === 404 || err.response?.status === 403) {
+      res.json({ results: [], message: 'Team members endpoint not available' });
+      return;
+    }
+    res.status(err.response?.status || 500).json({
+      error: 'Failed to fetch team members',
+      detail: err.response?.data || err.message,
+    });
+  }
+});
+
 // ─── Bid Packages (top-level, filtered by projectId) ────────────────────────
 
 router.get('/projects/:id/bid-packages', requireAuth, async (req, res) => {
@@ -107,21 +135,55 @@ router.get('/bid-packages/:id', requireAuth, async (req, res) => {
   }
 });
 
-// ─── Invites (bidders per bid package) ──────────────────────────────────────
+// ─── Invites (bidders per bid package) — merged with bid data ───────────────
 
 router.get('/bid-packages/:id/invitees', requireAuth, async (req, res) => {
   try {
     const data = await apiGet(req, `${BC_BASE}/invites`, {
       'filter[bidPackageId]': req.params.id,
     });
-    // Log first invite to see actual field names
     const list = data?.results || [];
     if (list.length > 0) {
       console.log('=== INVITE FIELDS ===');
       console.log('Keys:', Object.keys(list[0]));
       console.log('First invite:', JSON.stringify(list[0], null, 2));
     }
-    res.json(data);
+
+    // Also fetch bids for this bid package and merge totals + attachments
+    let bidsByInviteId = {};
+    try {
+      const bidsData = await apiGet(req, `${BC_BASE}/bids`, {
+        'filter[bidPackageId]': req.params.id,
+      });
+      const bids = bidsData?.results || [];
+      if (bids.length > 0) {
+        console.log('=== BID FIELDS (for bid package) ===');
+        console.log('Keys:', Object.keys(bids[0]));
+        console.log('First bid:', JSON.stringify(bids[0], null, 2));
+      }
+      for (const bid of bids) {
+        if (bid.inviteId) {
+          bidsByInviteId[bid.inviteId] = {
+            bidId: bid.id,
+            total: bid.total,
+            amount: bid.amount,
+            totalAmount: bid.totalAmount,
+            submittedAt: bid.submittedAt || bid.createdAt,
+            attachments: bid.attachments || [],
+          };
+        }
+      }
+    } catch (bidErr) {
+      console.log('Could not fetch bids for bid package:', bidErr.response?.status || bidErr.message);
+    }
+
+    // Merge bid data into invitees
+    const merged = list.map(inv => {
+      const bidData = bidsByInviteId[inv.id] || {};
+      return { ...inv, ...bidData };
+    });
+
+    res.json({ ...data, results: merged });
   } catch (err) {
     console.error('Invitees error:', JSON.stringify(err.response?.data || err.message));
     res.status(err.response?.status || 500).json({
@@ -397,4 +459,26 @@ router.get('/debug/raw', requireAuth, async (req, res) => {
   }
 });
 
+// ─── Calendar Sync Status ────────────────────────────────────────────────────
+
+router.get('/calendar-sync/status', requireAuth, async (req, res) => {
+  try {
+    const { loadLog } = await import('./calendar-sync.js');
+    const log = loadLog();
+    const entries = Object.values(log);
+    res.json({
+      totalEvents: entries.length,
+      lastSync: entries.length > 0
+        ? entries.reduce((latest, e) => {
+            const d = e.updatedAt || e.createdAt || '';
+            return d > latest ? d : latest;
+          }, '')
+        : null,
+    });
+  } catch (err) {
+    res.json({ totalEvents: 0, lastSync: null, error: err.message });
+  }
+});
+
+export { apiGet };
 export default router;
