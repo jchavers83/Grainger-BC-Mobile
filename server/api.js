@@ -459,6 +459,46 @@ router.get('/debug/raw', requireAuth, async (req, res) => {
   }
 });
 
+// ─── Deadline Dashboard (projects + bid packages in one call) ────────────────
+
+router.get('/deadline-dashboard', requireAuth, async (req, res) => {
+  try {
+    const data = await apiGet(req, `${BC_BASE}/projects`);
+    const projects = data?.results || data || [];
+
+    // Fetch bid packages for all projects in parallel
+    const results = await Promise.all(
+      projects.map(async (project) => {
+        let bidPackages = [];
+        try {
+          const bpData = await apiGet(req, `${BC_BASE}/bid-packages`, {
+            'filter[projectId]': project.id,
+          });
+          bidPackages = (bpData?.results || []).map(bp => ({
+            id: bp.id,
+            name: bp.name,
+            bidsDueAt: bp.bidsDueAt,
+            state: bp.state || bp.status || '',
+            keywords: bp.keywords || [],
+            trade: bp.trade || '',
+          }));
+        } catch {
+          // bid packages may not be available for all projects
+        }
+        return { ...project, bidPackages };
+      })
+    );
+
+    res.json({ results });
+  } catch (err) {
+    console.error('Deadline dashboard error:', JSON.stringify(err.response?.data || err.message));
+    res.status(err.response?.status || 500).json({
+      error: 'Failed to fetch deadline data',
+      detail: err.response?.data || err.message,
+    });
+  }
+});
+
 // ─── Calendar Sync Status ────────────────────────────────────────────────────
 
 router.get('/calendar-sync/status', requireAuth, async (req, res) => {
