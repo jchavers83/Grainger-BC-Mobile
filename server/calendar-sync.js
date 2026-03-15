@@ -28,12 +28,17 @@ const FULL_DISTRIBUTION_CREATORS = [
 // ─── Auth ──────────────────────────────────────────────────────────────────────
 
 function getAuthClient(subjectEmail) {
-  const auth = new GoogleAuth({
+  const credsJson = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
+  const authConfig = {
     scopes: [CALENDAR_SCOPE],
     clientOptions: {
       subject: subjectEmail,
     },
-  });
+  };
+  if (credsJson) {
+    authConfig.credentials = JSON.parse(credsJson);
+  }
+  const auth = new GoogleAuth(authConfig);
   return auth;
 }
 
